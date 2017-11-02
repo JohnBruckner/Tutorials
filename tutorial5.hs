@@ -41,12 +41,21 @@ isBloodOrange (Apple _ _) = False
 isBloodOrange (Orange x _) = x `elem` ["Moro", "Taroco", "Sanguinello"]
 
 -- 2.
---bloodOrangeSegments :: [Fruit] -> Int
---bloodOrangeSegments f = sum [x | x<-]
+orangeSegments :: Fruit -> Int
+orangeSegments (Orange _ n) = n
+orangeSegments (Apple _ _) = 0
+
+bloodOrangeSegments :: [Fruit] -> Int
+bloodOrangeSegments fs = sum [orangeSegments x | x <- fs, isBloodOrange x]
 
 -- 3.
+hasWorm :: Fruit  -> Int
+hasWorm (Orange _ _) = 0
+hasWorm (Apple _ False) = 0
+hasWorm (Apple _ True) = 1
+
 worms :: [Fruit] -> Int
-worms = undefined
+worms fs = sum [hasWorm x | x <- fs]
 
 -- Implementing propositional logic in Haskell
 -- The datatype 'Prop'
@@ -58,6 +67,8 @@ data Prop = Var Name
           | Not Prop
           | Prop :|: Prop
           | Prop :&: Prop
+          | Prop :->: Prop
+          | Prop :<->: Prop
           deriving (Eq, Ord)
 
 type Names = [Name]
@@ -74,6 +85,8 @@ showProp (T)            =  "T"
 showProp (Not p)        =  "(~" ++ showProp p ++ ")"
 showProp (p :|: q)      =  "(" ++ showProp p ++ "|" ++ showProp q ++ ")"
 showProp (p :&: q)      =  "(" ++ showProp p ++ "&" ++ showProp q ++ ")"
+showProp (p :->: q)     =  "(" ++ showProp p ++ "->" ++ showProp q ++ ")"
+showProp (p :<->: q)    =  "(" ++ showProp p ++ "<->" ++ showProp q ++ ")"
 
 -- evaluates a proposition in a given environment
 eval :: Env -> Prop -> Bool
@@ -83,6 +96,8 @@ eval e (T)            =  True
 eval e (Not p)        =  not (eval e p)
 eval e (p :|: q)      =  eval e p || eval e q
 eval e (p :&: q)      =  eval e p && eval e q
+eval e (p :->: q)     =  not (eval e p) || eval e q
+eval e (p :<->: q)    =  (eval e p && eval e q) || ((not (eval e p)) && (not (eval e q)))
 
 -- retrieves the names of variables from a proposition -
 --  NOTE: variable names in the result must be unique
@@ -93,6 +108,8 @@ names (T)            =  []
 names (Not p)        =  names p
 names (p :|: q)      =  nub (names p ++ names q)
 names (p :&: q)      =  nub (names p ++ names q)
+names (p :->: q)     =  nub (names p ++ names q)
+names (p :<->: q)    =  nub (names p ++ names q)
 
 -- creates all possible truth assignments for a set of variables
 envs :: Names -> [Env]
@@ -108,37 +125,50 @@ satisfiable p  =  or [ eval e p | e <- envs (names p) ]
 -- Exercises ------------------------------------------------------------
 
 -- 4.
-p1 = undefined
-p2 = undefined
-p3 = undefined
+--((P ∨Q)&(P &Q))
+p1 = (Var "P" :|: Var "Q") :&: (Var "P" :&: Var "Q")
+--((P ∨ Q) & ((¬P) & (¬Q)))
+p2 = ((Var "P" :|: Var "Q") :&: ((Not (Var "P")) :&: (Not (Var "Q"))))
+--((P & (Q ∨ R)) & (((¬P) ∨ (¬Q)) & ((¬P) ∨ (¬R))))
+p3 = ((Var "P" :&: (Var "Q" :|: Var "R")) :&: ((Not (Var "P"))) :|: Not (Var "Q") :&:
+                                              ((Not (Var "P")) :|: (Not (Var "R"))))
 
 
 -- 5.
 tautology :: Prop -> Bool
-tautology = undefined
+tautology p = and [eval e p | e <- envs (names p)]
 
 prop_taut1 :: Prop -> Bool
-prop_taut1 = undefined
+prop_taut1 p = satisfiable (Not p) /= tautology p
 
 prop_taut2 :: Prop -> Bool
-prop_taut2 = undefined
+prop_taut2 p = satisfiable p /= tautology (Not p)
+
+prop_taut3 :: Prop -> Bool
+prop_taut3 p = prop_taut1 p == prop_taut2 p
 
 
 -- 6.
-p4 = undefined
-p5 = undefined
-p6 = undefined
+--((P →Q)&(P ↔Q))
+p4 = ((Var "P" :->: Var "Q") :&: (Var "P" :<->: Var "Q"))
+--((P →Q)&(P &(¬Q)))
+p5 = ((Var "P" :->: Var "Q") :&: (Var "P" :&: (Not (Var "Q"))))
+--((P ↔Q)&((P &(¬Q))∨((¬P)&Q)))
+p6 = ((Var "P" :<->: Var "Q") :&: ((Var "P" :&: (Not (Var "Q")) :|: ((Not (Var "P")) :&: (Var "Q")))))
 
 
 -- 7.
+evals :: Prop -> [Bool]
+evals p = [eval e p | e <- envs (names p)]
+
 equivalent :: Prop -> Prop -> Bool
-equivalent = undefined
+equivalent p q = evals p == evals q
 
 equivalent' :: Prop -> Prop -> Bool
-equivalent' = undefined
+equivalent' p q = tautology (p :<->: q)
 
 prop_equivalent :: Prop -> Prop -> Bool
-prop_equivalent = undefined
+prop_equivalent p q = equivalent p q == equivalent' p q
 
 
 -- 8.
@@ -216,8 +246,8 @@ instance Arbitrary Prop where
                                        , liftM Not subform
                                        , liftM2 (:|:) subform subform
                                        , liftM2 (:&:) subform subform
-                                     --  , liftM2 (:->:) subform subform
-                                     --  , liftM2 (:<->:) subform' subform'
+                                       , liftM2 (:->:) subform subform
+                                       , liftM2 (:<->:) subform' subform'
                                        ]
                  where
                    atom = oneof [liftM Var (elements ["P", "Q", "R", "S"]),
