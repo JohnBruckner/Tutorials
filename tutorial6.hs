@@ -16,7 +16,7 @@ import Data.List
 import Test.QuickCheck
 
 main :: IO ()
-main = display (hilbert 100)
+main = display (arrowhead 10)
 
 
 -- Exercise 1
