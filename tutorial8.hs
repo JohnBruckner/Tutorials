@@ -107,7 +107,7 @@ ddelta fsa l a = canonical . concat $ [delta fsa x a | x <- l]
 
 -- 6.
 next :: (Ord q) => FSM q -> [[q]] -> [[q]]
-next fsa l = nub $ l ++ [ddelta fsa x y | x <- l, y <- (alph fsa)]
+next fsa l = canonical $ l ++ [ddelta fsa x y | x <- l, y <- (alph fsa)]
 
 
 -- 7.
